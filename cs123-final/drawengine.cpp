@@ -20,6 +20,7 @@
 #include <QGLFramebufferObject>
 #define GL_GLEXT_PROTOTYPES
 #include <GL/glext.h>
+#include <CS123Algebra.h>
 
 using std::cout;
 using std::endl;
@@ -330,6 +331,8 @@ void DrawEngine::render_blur(float w,float h) {
 
 **/
 void DrawEngine::render_scene(float time,int w,int h) {
+    GLUquadric* quad = gluNewQuadric();
+
     glEnable(GL_DEPTH_TEST);
     glClear(GL_DEPTH_BUFFER_BIT);
     glEnable(GL_TEXTURE_CUBE_MAP);
@@ -341,16 +344,27 @@ void DrawEngine::render_scene(float time,int w,int h) {
     shader_programs_["refract"]->setUniformValue("CubeMap",GL_TEXTURE0);
     glPushMatrix();
     glTranslatef(-1.25f,0.f,0.f);
-    glCallList(models_["dragon"].idx);
+
+    //glCallList(models_["dragon"].idx);
+    //gluSphere(quad, 1, 20, 20);
+    drawKleinBottle();
     glPopMatrix();
     shader_programs_["refract"]->release();
     shader_programs_["reflect"]->bind();
     shader_programs_["reflect"]->setUniformValue("CubeMap",GL_TEXTURE0);
     glPushMatrix();
     glTranslatef(1.25f,0.f,0.f);
-    glCallList(models_["dragon"].idx);
+
+    //glCallList(models_["dragon"].idx);
     glPopMatrix();
     shader_programs_["reflect"]->release();
+
+    // draw our other sphere
+    glPushMatrix();
+    glTranslatef(2, 0, 0);
+    gluSphere(quad, 1, 20, 20);
+    glPopMatrix();
+
     glDisable(GL_CULL_FACE);
     glDisable(GL_DEPTH_TEST);
     glBindTexture(GL_TEXTURE_CUBE_MAP,0);
@@ -358,56 +372,7 @@ void DrawEngine::render_scene(float time,int w,int h) {
 
 
 
-
-    // BEZIER:
-    // Control points (substitute these values with your own if you like)
-    double Ax = -2.0; double Ay = -1.0; double Az = 1.0;
-    double Bx = -1.0; double By = 3.0; double Bz = 1.0;
-    double Cx = 1.0; double Cy = -3.0; double Cz = -1.0;
-    double Dx = 2.0; double Dy = 1.0; double Dz = -1.0;
-
-    // Points on the curve
-    double X;
-    double Y;
-    double Z;
-
-    // Variable
-    double a = 1.0;
-    double b = 1.0 - a;
-
-    // Tell OGL to start drawing a line strip
-    glBegin(GL_LINE_STRIP);
-
-    /* We will not actually draw a curve, but we will divide the curve into small
-    points and draw a line between each point. If the points are close enough, it
-    will appear as a curved line. 20 points are plenty, and since the variable goes
-    from 1.0 to 0.0 we must change it by 1/20 = 0.05 each time */
-
-    for(int i = 0; i <= 20; i++)
-    {
-      // Get a point on the curve
-      X = Ax*a*a*a + Bx*3*a*a*b + Cx*3*a*b*b + Dx*b*b*b;
-      Y = Ay*a*a*a + By*3*a*a*b + Cy*3*a*b*b + Dy*b*b*b;
-      Z = Az*a*a*a + Bz*3*a*a*b + Cz*3*a*b*b + Dz*b*b*b;
-
-      // Draw the line from point to point (assuming OGL is set up properly)
-      glVertex3d(X, Y, Z);
-
-      // Change the variable
-      a -= 0.05;
-      b = 1.0 - a;
-    }
-
-    // Tell OGL to stop drawing the line strip
-    glEnd();
-
-    /* Normally you will want to save the coordinates to an array for later use. And
-    you will probably not need to calculate the curve each frame. This code
-    demonstrates an easily understandable way to do it, not necessarily the most
-    useful way. */
-
-
-
+    gluDeleteQuadric(quad);
 }
 
 /**
@@ -432,6 +397,107 @@ void DrawEngine::textured_quad(int w,int h,bool flip) {
     glVertex2f(w,h);
     glTexCoord2f(0.0f,flip ? 0.0f : 1.0f);
     glVertex2f(0.0f,h);
+    glEnd();
+}
+
+void DrawEngine::drawKleinBottle(){
+    float m_param1 = 50;
+    float m_param2 = 50;
+    float diffi = (360 / (float) m_param1)*(M_PI / 180.0);
+    float diffj = (360 / (float) m_param2)*(M_PI / 180.0);
+    glBegin(GL_QUADS);
+    for(int i=0; i<m_param1; i++){
+        for(int j=0; j<m_param2; j++){
+
+            float u = i*diffi;
+            float v = j*diffj;
+            float cosu = cos(u);
+            float cosv = cos(v);
+            float sinu = sin(u);
+            float sinv = sin(v);
+            float r = 4*(1-cosu/2.0);
+
+            float x1, y1;
+            if(u <= M_PI){
+                x1 = 6*cosu*(1+sinu) + r*cosu*cosv;
+                y1 = 16*sinu + r*sinu*cosv;
+            }
+            else{
+                x1 = 6*cosu*(1+sinu) + r*cos(v + M_PI);
+                y1 = 16*sinu;
+            }
+            float z1 = r*sinv;
+            glVertex3f(x1, y1, z1);
+
+            u = (i+1)*diffi;
+            v = j*diffj;
+            cosu = cos(u);
+            cosv = cos(v);
+            sinu = sin(u);
+            sinv = sin(v);
+            r = 4*(1-cosu/2.0);
+            float x2, y2;
+            if(u <= M_PI){
+                x2 = 6*cosu*(1+sinu) + r*cosu*cosv;
+                y2 = 16*sinu + r*sinu*cosv;
+            }
+            else{
+                x2 = 6*cosu*(1+sinu) + r*cos(v + M_PI);
+                y2 = 16*sinu;
+            }
+            float z2 = r*sinv;
+
+            glVertex3f(x2, y2, z2);
+
+
+            u = (i+1)*diffi;
+            v = (j+1)*diffj;
+            cosu = cos(u);
+            cosv = cos(v);
+            sinu = sin(u);
+            sinv = sin(v);
+            r = 4*(1-cosu/2.0);
+            float x3, y3;
+            if(u <= M_PI){
+                x3 = 6*cosu*(1+sinu) + r*cosu*cosv;
+                y3 = 16*sinu + r*sinu*cosv;
+            }
+            else{
+                x3 = 6*cosu*(1+sinu) + r*cos(v + M_PI);
+                y3 = 16*sinu;
+            }
+            float z3 = r*sinv;
+
+
+            glVertex3f(x3, y3, z3);
+
+            u = i*diffi;
+            v = (j+1)*diffj;
+            cosu = cos(u);
+            cosv = cos(v);
+            sinu = sin(u);
+            sinv = sin(v);
+            r = 4*(1-cosu/2.0);
+            float x4, y4;
+            if(u <= M_PI){
+                x4 = 6*cosu*(1+sinu) + r*cosu*cosv;
+                y4 = 16*sinu + r*sinu*cosv;
+            }
+            else{
+                x4 = 6*cosu*(1+sinu) + r*cos(v + M_PI);
+                y4 = 16*sinu;
+            }
+            float z4 = r*sinv;
+            glVertex3f(x4, y4, z4);
+            glVertex3f(x4, y4, z4);
+            glVertex3f(x3, y3, z3);
+            glVertex3f(x2, y2, z2);
+            glVertex3f(x1, y1, z1);
+
+
+        }
+
+    }
     glEnd();
 }
 

@@ -45,6 +45,7 @@ protected:
 
     //methods
     void perspective_camera(int w, int h);
+    void drawKleinBottle();
     void orthogonal_camera(int w, int h);
     void textured_quad(int w, int h, bool flip);
     void render_scene(float time, int w, int h);
