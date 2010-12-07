@@ -58,7 +58,7 @@ protected:
     void create_fbos(int w, int h);
     void create_blur_kernel(int radius,int w,int h,GLfloat* kernel,GLfloat* offsets);
     void render_scene(QGLFramebufferObject* fb, Vector3 eye, Vector3 pos, Vector3 up, int w, int h);
-    void render_to_buffer(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h);
+    //void render_to_buffer(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h);
     void render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up, int w, int h);
     GLuint generate_refract_cube_map();
     GLuint refract_cube_map;
