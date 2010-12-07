@@ -6,6 +6,7 @@
 #include <qgl.h>
 #include "glm.h"
 #include "common.h"
+#include <CS123Algebra.h>
 
 class QGLContext;
 class QGLShaderProgram;
@@ -48,7 +49,6 @@ protected:
     void drawKleinBottle();
     void orthogonal_camera(int w, int h);
     void textured_quad(int w, int h, bool flip);
-    void render_scene(float time, int w, int h);
     void realloc_framebuffers(int w, int h);
     void render_blur(float width, float height);
     void load_models();
@@ -57,6 +57,12 @@ protected:
     GLuint load_cube_map(QList<QFile *> files);
     void create_fbos(int w, int h);
     void create_blur_kernel(int radius,int w,int h,GLfloat* kernel,GLfloat* offsets);
+    void render_scene(QGLFramebufferObject* fb, Vector3 eye, Vector3 pos, Vector3 up, int w, int h);
+    void render_to_buffer(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h);
+    void render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up, int w, int h);
+    GLuint generate_refract_cube_map();
+    GLuint refract_cube_map;
+    GLuint refract_framebuffer;
 
     //member variables
     QHash<QString, QGLShaderProgram *>          shader_programs_; ///hash map of all shader programs
@@ -66,6 +72,11 @@ protected:
     const QGLContext                            *context_; ///the current OpenGL context to render to
     float                                       previous_time_, fps_; ///the previous time and the fps counter
     Camera                                      camera_; ///a simple camera struct
+
+    Vector3 refract_center;
+
+    /*GLuint load_cube_map(QGLFramebufferObject* posx, QGLFramebufferObject* negx, QGLFramebufferObject* posy,
+                                     QGLFramebufferObject* negy, QGLFramebufferObject* posz, QGLFramebufferObject* negz, int w, int h);*/
 };
 
 #endif // DRAWENGINE_H

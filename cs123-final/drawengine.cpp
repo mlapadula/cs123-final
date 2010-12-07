@@ -27,6 +27,21 @@ using std::endl;
 
 extern "C"{
     extern void APIENTRY glActiveTexture (GLenum);
+    extern GLboolean APIENTRY glIsRenderbufferEXT (GLuint);
+    extern void APIENTRY glBindRenderbufferEXT (GLenum, GLuint);
+    extern void APIENTRY glDeleteRenderbuffersEXT (GLsizei, const GLuint *);
+    extern void APIENTRY glGenRenderbuffersEXT (GLsizei, GLuint *);
+    extern void APIENTRY glRenderbufferStorageEXT (GLenum, GLenum, GLsizei, GLsizei);
+    extern void APIENTRY glGetRenderbufferParameterivEXT (GLenum, GLenum, GLint *);
+    extern GLboolean APIENTRY glIsFramebufferEXT (GLuint);
+    extern void APIENTRY glBindFramebufferEXT (GLenum, GLuint);
+    extern void APIENTRY glDeleteFramebuffersEXT (GLsizei, const GLuint *);
+    extern void APIENTRY glGenFramebuffersEXT (GLsizei, GLuint *);
+    extern GLenum APIENTRY glCheckFramebufferStatusEXT (GLenum);
+    extern void APIENTRY glFramebufferTexture1DEXT (GLenum, GLenum, GLenum, GLuint, GLint);
+    extern void APIENTRY glFramebufferTexture2DEXT (GLenum, GLenum, GLenum, GLuint, GLint);
+    extern void APIENTRY glFramebufferTexture3DEXT (GLenum, GLenum, GLenum, GLuint, GLint, GLint);
+    extern void APIENTRY glFramebufferRenderbufferEXT (GLenum, GLenum, GLenum, GLuint);
 }
 
 /**
@@ -42,6 +57,7 @@ extern "C"{
 
 **/
 DrawEngine::DrawEngine(const QGLContext *context,int w,int h) : context_(context) {
+
     //initialize ogl settings
     glEnable(GL_TEXTURE_2D);
     glFrontFace(GL_CCW);
@@ -66,6 +82,8 @@ DrawEngine::DrawEngine(const QGLContext *context,int w,int h) : context_(context
     load_shaders();
     load_textures();
     create_fbos(w,h);
+    refract_center = Vector3(2,0,0);
+    refract_cube_map = generate_refract_cube_map();
     cout << "Rendering..." << endl;
 }
 
@@ -187,6 +205,29 @@ void DrawEngine::load_textures() {
     fileList.append(new QFile("../cs123-final/textures/astra/negz.jpg"));
     textures_["cube_map_1"] = load_cube_map(fileList);
 }
+
+GLuint DrawEngine::generate_refract_cube_map() {
+    GLuint id;
+    glGenTextures(1,&id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,id);
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    //NULL means reserve texture memory, but texels are undefined
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+0, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+1, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+2, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+3, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+4, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+5, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
+    return id;
+}
+
 /**
   @paragraph Creates the intial framebuffers for drawing.  Called by the ctor once
   upon initialization.
@@ -210,6 +251,10 @@ void DrawEngine::create_fbos(int w,int h) {
     //You need to create another framebuffer here.  Look up two lines to see how to do this... =.=
     framebuffer_objects_["fbo_2"] = new QGLFramebufferObject(w,h,QGLFramebufferObject::NoAttachment,
                                                              GL_TEXTURE_2D,GL_RGB16F_ARB);
+
+    // framebuffers for our 6 refracted directions
+    // in order: +x, -x, +y, -y, +z, -z
+    glGenFramebuffersEXT(1, &refract_framebuffer);
 }
 /**
   @paragraph Reallocates all the framebuffers.  Called when the viewport is
@@ -240,17 +285,52 @@ void DrawEngine::realloc_framebuffers(int w,int h) {
 **/
 void DrawEngine::draw_frame(float time,int w,int h) {
     fps_ = 1000.f / (time - previous_time_),previous_time_ = time;
-    //Render the scene to a framebuffer
-    framebuffer_objects_["fbo_0"]->bind();
-    perspective_camera(w,h);
-    render_scene(time,w,h);
-    framebuffer_objects_["fbo_0"]->release();
+
+
+    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, refract_framebuffer);
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, refract_cube_map, 0);
+    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                     Vector3(refract_center.x+1, refract_center.y, refract_center.z),
+                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+
+
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, refract_cube_map, 0);
+    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                     Vector3(refract_center.x-1, refract_center.y, refract_center.z),
+                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+
+
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, refract_cube_map, 0);
+    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                     Vector3(refract_center.x, refract_center.y+1, refract_center.z),
+                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+
+
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, refract_cube_map, 0);
+    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                     Vector3(refract_center.x, refract_center.y-1, refract_center.z),
+                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+
+
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, refract_cube_map, 0);
+    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                     Vector3(refract_center.x, refract_center.y, refract_center.z+1),
+                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+
+
+    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, refract_cube_map, 0);
+    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                     Vector3(refract_center.x, refract_center.y, refract_center.z-1),
+                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+
+    render_scene(framebuffer_objects_["fbo_0"], Vector3(camera_.center.x, camera_.center.y, camera_.center.z), Vector3(camera_.eye.x, camera_.eye.y, camera_.eye.z), Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+
+
     //copy the rendered scene into framebuffer 1
     framebuffer_objects_["fbo_0"]->blitFramebuffer(framebuffer_objects_["fbo_1"],
                                                    QRect(0,0,w,h),framebuffer_objects_["fbo_0"],
                                                    QRect(0,0,w,h),GL_COLOR_BUFFER_BIT,GL_NEAREST);
 
-    //you may want to add code here
     orthogonal_camera(w,h);
     glBindTexture(GL_TEXTURE_2D, framebuffer_objects_["fbo_1"]->texture());
     textured_quad(w, h, true);
@@ -322,6 +402,188 @@ void DrawEngine::render_blur(float w,float h) {
     framebuffer_objects_["fbo_1"]->release();   // unbind framebuffer
 }
 
+void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up, int w, int h) {
+    float ratio = w / static_cast<float>(h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(camera_.fovy,ratio,camera_.near,camera_.far);
+    gluLookAt(eye.x, eye.y, eye.z + .000000001,
+              pos.x, pos.y, pos.z,
+              up.x, up.y, up.z);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    GLUquadric* quad = gluNewQuadric();
+
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_TEXTURE_CUBE_MAP);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textures_["cube_map_1"]);
+    glCallList(models_["skybox"].idx);
+    glEnable(GL_CULL_FACE);
+    glActiveTexture(GL_TEXTURE0);
+
+    // sphere to draw (without shader)
+    glPushMatrix();
+    gluSphere(quad, 1, 20, 20);
+    glPopMatrix();
+
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
+    glDisable(GL_TEXTURE_CUBE_MAP);
+
+    gluDeleteQuadric(quad);
+}
+
+void DrawEngine::render_to_buffer(QGLFramebufferObject* fb, Vector3 eye, Vector3 pos, Vector3 up, int w, int h) {
+
+    /*cout << "pos: " << pos << endl;
+    cout << "eye: " << eye << endl;*/
+
+    fb->bind();
+    float ratio = w / static_cast<float>(h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(camera_.fovy,ratio,camera_.near,camera_.far);
+    gluLookAt(eye.x, eye.y, eye.z + .000000001,
+              pos.x, pos.y, pos.z,
+              up.x, up.y, up.z);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+
+    GLUquadric* quad = gluNewQuadric();
+
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_TEXTURE_CUBE_MAP);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textures_["cube_map_1"]);
+    glCallList(models_["skybox"].idx);
+    glEnable(GL_CULL_FACE);
+    glActiveTexture(GL_TEXTURE0);
+
+    // refracted sphere...
+    /*shader_programs_["refract"]->bind();
+    shader_programs_["refract"]->setUniformValue("CubeMap",GL_TEXTURE0);
+    glPushMatrix();
+    //glTranslatef(-1.25f,0.f,0.f);
+    //glCallList(models_["dragon"].idx);
+    glTranslatef(refract_center.x, refract_center.y, refract_center.z);
+    gluSphere(quad, 1, 20, 20);
+    glTranslatef(-refract_center.x, -refract_center.y, -refract_center.z);
+    //drawKleinBottle();
+    glPopMatrix();    
+    shader_programs_["refract"]->release();*/
+
+    // sphere to draw (without shader)
+    glPushMatrix();
+    gluSphere(quad, 1, 20, 20);
+    glPopMatrix();
+
+    // reflect sphere...
+    /*shader_programs_["reflect"]->bind();
+    shader_programs_["reflect"]->setUniformValue("CubeMap",GL_TEXTURE0);
+    glPushMatrix();
+    glTranslatef(1.25f,0.f,0.f);
+
+    //glCallList(models_["dragon"].idx);
+    glPopMatrix();
+    shader_programs_["reflect"]->release();*/
+
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
+    glDisable(GL_TEXTURE_CUBE_MAP);
+
+    gluDeleteQuadric(quad);
+
+    fb->release();
+    /*float ratio = w / static_cast<float>(h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(camera_.fovy,ratio,camera_.near,camera_.far);
+    gluLookAt(0,0,-1,refract_center.x,refract_center.y,refract_center.z,camera_.up.x,camera_.up.y,camera_.up.z);
+    // center = object's center
+    // eye = all 6 directions
+    // up = same up
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    framebuffer_objects_["fbo_3"]*/
+}
+
+void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h) {
+
+    fb->bind();
+    float ratio = w / static_cast<float>(h);
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(camera_.fovy,ratio,camera_.near,camera_.far);
+    gluLookAt(camera_.eye.x, camera_.eye.y, camera_.eye.z,
+              camera_.center.x, camera_.center.y, camera_.center.z,
+              camera_.up.x, camera_.up.y, camera_.up.z);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+
+    GLUquadric* quad = gluNewQuadric();
+
+    glEnable(GL_DEPTH_TEST);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_TEXTURE_CUBE_MAP);
+
+
+    textures_["cube_map_2"] = refract_cube_map;
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textures_["cube_map_1"]);
+    glCallList(models_["skybox"].idx);
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textures_["cube_map_2"]);
+    glEnable(GL_CULL_FACE);
+    glActiveTexture(GL_TEXTURE0);
+
+    // refracted sphere...
+    shader_programs_["refract"]->bind();
+    shader_programs_["refract"]->setUniformValue("CubeMap",GL_TEXTURE0);
+    glPushMatrix();
+    //glTranslatef(-1.25f,0.f,0.f);
+    //glCallList(models_["dragon"].idx);
+    glTranslatef(refract_center.x, refract_center.y, refract_center.z);
+    gluSphere(quad, 1, 20, 20);
+    glTranslatef(-refract_center.x, -refract_center.y, -refract_center.z);
+    //drawKleinBottle();
+    glPopMatrix();
+    shader_programs_["refract"]->release();
+
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textures_["cube_map_1"]);
+
+    // sphere to draw (without shader)
+    glPushMatrix();
+    gluSphere(quad, 1, 20, 20);
+    glPopMatrix();
+
+    // reflect sphere...
+    /*shader_programs_["reflect"]->bind();
+    shader_programs_["reflect"]->setUniformValue("CubeMap",GL_TEXTURE0);
+    glPushMatrix();
+    glTranslatef(1.25f,0.f,0.f);
+
+    //glCallList(models_["dragon"].idx);
+    glPopMatrix();
+    shader_programs_["reflect"]->release();*/
+
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
+    glDisable(GL_TEXTURE_CUBE_MAP);
+
+    gluDeleteQuadric(quad);
+
+    fb->release();
+}
+
 /**
   @paragraph Renders the actual scene.  May be called multiple times by
   DrawEngine::draw_frame(float time,int w,int h) if necessary.
@@ -330,7 +592,8 @@ void DrawEngine::render_blur(float w,float h) {
   @param h: the viewport height
 
 **/
-void DrawEngine::render_scene(float time,int w,int h) {
+/*void DrawEngine::render_scene(float time, int w,int h) {
+
     GLUquadric* quad = gluNewQuadric();
 
     glEnable(GL_DEPTH_TEST);
@@ -346,8 +609,8 @@ void DrawEngine::render_scene(float time,int w,int h) {
     glTranslatef(-1.25f,0.f,0.f);
 
     //glCallList(models_["dragon"].idx);
-    //gluSphere(quad, 1, 20, 20);
-    drawKleinBottle();
+    gluSphere(quad, 1, 20, 20);
+    //drawKleinBottle();
     glPopMatrix();
     shader_programs_["refract"]->release();
     shader_programs_["reflect"]->bind();
@@ -361,7 +624,11 @@ void DrawEngine::render_scene(float time,int w,int h) {
 
     // draw our other sphere
     glPushMatrix();
-    glTranslatef(2, 0, 0);
+    REAL refract_x = 1;
+    REAL refract_y = 0;
+    REAL refract_z = 0;
+    glTranslatef(refract_x, refract_y, refract_z);
+    refract_center = Vector3(refract_x, refract_y, refract_z);
     gluSphere(quad, 1, 20, 20);
     glPopMatrix();
 
@@ -370,10 +637,8 @@ void DrawEngine::render_scene(float time,int w,int h) {
     glBindTexture(GL_TEXTURE_CUBE_MAP,0);
     glDisable(GL_TEXTURE_CUBE_MAP);
 
-
-
     gluDeleteQuadric(quad);
-}
+}*/
 
 /**
   @paragraph Draws a textured quad. The texture most be bound and unbound
@@ -517,6 +782,12 @@ void DrawEngine::perspective_camera(int w,int h) {
     gluLookAt(camera_.eye.x,camera_.eye.y,camera_.eye.z,
               camera_.center.x,camera_.center.y,camera_.center.z,
               camera_.up.x,camera_.up.y,camera_.up.z);
+
+    //gluLookAt(0,0,-1,refract_center.x,refract_center.y,refract_center.z,camera_.up.x,camera_.up.y,camera_.up.z);
+    // center = object's center
+    // eye = all 6 directions
+    // up = same up
+
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 }
@@ -605,6 +876,44 @@ GLuint DrawEngine::load_cube_map(QList<QFile *> files) {
     glBindTexture(GL_TEXTURE_CUBE_MAP,0);
     return id;
 }
+
+/*GLuint DrawEngine::load_cube_map(QGLFramebufferObject* posx, QGLFramebufferObject* negx, QGLFramebufferObject* posy,
+                                 QGLFramebufferObject* negy, QGLFramebufferObject* posz, QGLFramebufferObject* negz, int w, int h) {
+    GLuint id;
+    glGenTextures(1,&id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,id);
+
+
+    /*for (unsigned face = 0; face < 6; face++) {
+        QImage texture = posx->toImage();
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,3,3,texture.width(),texture.height(),0,GL_RGBA,GL_UNSIGNED_BYTE,texture.bits());
+        gluBuild2DMipmaps(GL_TEXTURE_CUBE_MAP_POSITIVE_X +face, 3, texture.width(), texture.height(), GL_RGBA, GL_UNSIGNED_BYTE, texture.bits());
+    }*/
+
+    /*glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_POSITIVE_X, posx->texture(), 1);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, posx->texture(), 1);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, posx->texture(), 1);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, posx->texture(), 1);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, posx->texture(), 1);
+    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, posx->texture(), 1);*/
+
+    /*for(unsigned i = 0; i < 6; ++i) {
+        QImage image,texture;
+
+        image = posx->toImage();
+
+        image = image.mirrored(false,true);
+        texture = QGLWidget::convertToGLFormat(image);
+        texture = texture.scaledToWidth(1024,Qt::SmoothTransformation);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,3,3,texture.width(), texture.height(),0,GL_BGRA,GL_UNSIGNED_BYTE,texture.bits());
+        gluBuild2DMipmaps(GL_TEXTURE_CUBE_MAP_POSITIVE_X +i, 3, texture.width(), texture.height(), GL_BGRA, GL_UNSIGNED_BYTE, texture.bits());
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MIN_FILTER,GL_NEAREST_MIPMAP_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MAG_FILTER,GL_NEAREST_MIPMAP_NEAREST);
+    glBindTexture(GL_TEXTURE_CUBE_MAP,0);*/
+    /*return id;
+}*/
+
 /**
   @paragraph Creates a gaussian blur kernel with the specified radius.  The kernel values
   and offsets are stored.
