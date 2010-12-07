@@ -61,6 +61,8 @@ protected:
     //void render_to_buffer(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h);
     void render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up, int w, int h);
     GLuint generate_refract_cube_map();
+
+    int refract_every_so_often;
     GLuint refract_cube_map;
     GLuint refract_framebuffer;
 

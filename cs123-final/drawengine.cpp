@@ -84,6 +84,7 @@ DrawEngine::DrawEngine(const QGLContext *context,int w,int h) : context_(context
     create_fbos(w,h);
     refract_center = Vector3(2,0,0);
     refract_cube_map = generate_refract_cube_map();
+    refract_every_so_often = 0;
     cout << "Rendering..." << endl;
 }
 
@@ -217,18 +218,12 @@ GLuint DrawEngine::generate_refract_cube_map() {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     //NULL means reserve texture memory, but texels are undefined
-    /*glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+0, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+1, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+2, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+3, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+4, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+5, 0, GL_RGBA8, 512, 512, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);*/
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+0, 0, GL_RGBA8, 1024, 1024, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+1, 0, GL_RGBA8, 1024, 1024, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+2, 0, GL_RGBA8, 1024, 1024, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+3, 0, GL_RGBA8, 1024, 1024, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+4, 0, GL_RGBA8, 1024, 1024, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
-    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+5, 0, GL_RGBA8, 1024, 1024, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+0, 0, GL_RGBA8, 2048, 2048, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+1, 0, GL_RGBA8, 2048, 2048, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+2, 0, GL_RGBA8, 2048, 2048, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+3, 0, GL_RGBA8, 2048, 2048, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+4, 0, GL_RGBA8, 2048, 2048, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
+    glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X+5, 0, GL_RGBA8, 2048, 2048, 0, GL_BGRA, GL_UNSIGNED_BYTE, NULL);
 
     glBindTexture(GL_TEXTURE_CUBE_MAP,0);
     return id;
@@ -291,42 +286,42 @@ void DrawEngine::draw_frame(float time,int w,int h) {
     fps_ = 1000.f / (time - previous_time_),previous_time_ = time;
 
 
-    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, refract_framebuffer);
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, refract_cube_map, 0);
-    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                     Vector3(refract_center.x+1, refract_center.y, refract_center.z),
-                     Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
+    // render the cube map every other frame to save on computing power
+    if (refract_every_so_often % 2 == 0) {
+        glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, refract_framebuffer);
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x+1, refract_center.y, refract_center.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
 
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x-1, refract_center.y, refract_center.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
 
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, refract_cube_map, 0);
-    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                     Vector3(refract_center.x-1, refract_center.y, refract_center.z),
-                     Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x, refract_center.y+1, refract_center.z),
+                         Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
 
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x, refract_center.y-1, refract_center.z),
+                         Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
 
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, refract_cube_map, 0);
-    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                     Vector3(refract_center.x, refract_center.y+1, refract_center.z),
-                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x, refract_center.y, refract_center.z+1),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
 
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x, refract_center.y, refract_center.z-1),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
+    }
+    refract_every_so_often++;
 
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, refract_cube_map, 0);
-    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                     Vector3(refract_center.x, refract_center.y-1, refract_center.z),
-                     Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
-
-
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, refract_cube_map, 0);
-    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                     Vector3(refract_center.x, refract_center.y, refract_center.z+1),
-                     Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
-
-
-    glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, refract_cube_map, 0);
-    render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                     Vector3(refract_center.x, refract_center.y, refract_center.z-1),
-                     Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
-
+    // and render the actual scene
     render_scene(framebuffer_objects_["fbo_0"], Vector3(camera_.center.x, camera_.center.y, camera_.center.z), Vector3(camera_.eye.x, camera_.eye.y, camera_.eye.z), Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
 
 
@@ -411,7 +406,7 @@ void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
     gluPerspective(camera_.fovy,ratio,camera_.near,camera_.far);
-    glViewport(0,0,1024,1024);
+    glViewport(0,0,2048,2048);
     gluLookAt(eye.x, eye.y, eye.z + .000000001,
               pos.x, pos.y, pos.z,
               up.x, up.y, up.z);
@@ -494,7 +489,6 @@ void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 po
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
-
     GLUquadric* quad = gluNewQuadric();
 
     glEnable(GL_DEPTH_TEST);
@@ -559,53 +553,6 @@ void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 po
   @param h: the viewport height
 
 **/
-/*void DrawEngine::render_scene(float time, int w,int h) {
-
-    GLUquadric* quad = gluNewQuadric();
-
-    glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_TEXTURE_CUBE_MAP);
-    glBindTexture(GL_TEXTURE_CUBE_MAP,textures_["cube_map_1"]);
-    glCallList(models_["skybox"].idx);
-    glEnable(GL_CULL_FACE);
-    glActiveTexture(GL_TEXTURE0);
-    shader_programs_["refract"]->bind();
-    shader_programs_["refract"]->setUniformValue("CubeMap",GL_TEXTURE0);
-    glPushMatrix();
-    glTranslatef(-1.25f,0.f,0.f);
-
-    //glCallList(models_["dragon"].idx);
-    gluSphere(quad, 1, 20, 20);
-    //drawKleinBottle();
-    glPopMatrix();
-    shader_programs_["refract"]->release();
-    shader_programs_["reflect"]->bind();
-    shader_programs_["reflect"]->setUniformValue("CubeMap",GL_TEXTURE0);
-    glPushMatrix();
-    glTranslatef(1.25f,0.f,0.f);
-
-    //glCallList(models_["dragon"].idx);
-    glPopMatrix();
-    shader_programs_["reflect"]->release();
-
-    // draw our other sphere
-    glPushMatrix();
-    REAL refract_x = 1;
-    REAL refract_y = 0;
-    REAL refract_z = 0;
-    glTranslatef(refract_x, refract_y, refract_z);
-    refract_center = Vector3(refract_x, refract_y, refract_z);
-    gluSphere(quad, 1, 20, 20);
-    glPopMatrix();
-
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
-    glDisable(GL_TEXTURE_CUBE_MAP);
-
-    gluDeleteQuadric(quad);
-}*/
 
 /**
   @paragraph Draws a textured quad. The texture most be bound and unbound
@@ -843,43 +790,6 @@ GLuint DrawEngine::load_cube_map(QList<QFile *> files) {
     glBindTexture(GL_TEXTURE_CUBE_MAP,0);
     return id;
 }
-
-/*GLuint DrawEngine::load_cube_map(QGLFramebufferObject* posx, QGLFramebufferObject* negx, QGLFramebufferObject* posy,
-                                 QGLFramebufferObject* negy, QGLFramebufferObject* posz, QGLFramebufferObject* negz, int w, int h) {
-    GLuint id;
-    glGenTextures(1,&id);
-    glBindTexture(GL_TEXTURE_CUBE_MAP,id);
-
-
-    /*for (unsigned face = 0; face < 6; face++) {
-        QImage texture = posx->toImage();
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + face,3,3,texture.width(),texture.height(),0,GL_RGBA,GL_UNSIGNED_BYTE,texture.bits());
-        gluBuild2DMipmaps(GL_TEXTURE_CUBE_MAP_POSITIVE_X +face, 3, texture.width(), texture.height(), GL_RGBA, GL_UNSIGNED_BYTE, texture.bits());
-    }*/
-
-    /*glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_POSITIVE_X, posx->texture(), 1);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, posx->texture(), 1);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, posx->texture(), 1);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, posx->texture(), 1);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, posx->texture(), 1);
-    glFramebufferTexture(GL_FRAMEBUFFER, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, posx->texture(), 1);*/
-
-    /*for(unsigned i = 0; i < 6; ++i) {
-        QImage image,texture;
-
-        image = posx->toImage();
-
-        image = image.mirrored(false,true);
-        texture = QGLWidget::convertToGLFormat(image);
-        texture = texture.scaledToWidth(1024,Qt::SmoothTransformation);
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i,3,3,texture.width(), texture.height(),0,GL_BGRA,GL_UNSIGNED_BYTE,texture.bits());
-        gluBuild2DMipmaps(GL_TEXTURE_CUBE_MAP_POSITIVE_X +i, 3, texture.width(), texture.height(), GL_BGRA, GL_UNSIGNED_BYTE, texture.bits());
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MIN_FILTER,GL_NEAREST_MIPMAP_NEAREST);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP,GL_TEXTURE_MAG_FILTER,GL_NEAREST_MIPMAP_NEAREST);
-    glBindTexture(GL_TEXTURE_CUBE_MAP,0);*/
-    /*return id;
-}*/
 
 /**
   @paragraph Creates a gaussian blur kernel with the specified radius.  The kernel values
