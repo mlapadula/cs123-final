@@ -305,7 +305,10 @@ void DrawEngine::draw_frame(float time,int w,int h) {
     if (z_axis.x > 0) {
         theta = -theta;
     }
-    if (y_axis.z > 0) {
+    /*if (y_axis.z > 0) {
+        phi = -phi;
+    }*/
+    if (z_axis.y > 0) {
         phi = -phi;
     }
 
@@ -482,15 +485,17 @@ void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up
     glEnable(GL_CULL_FACE);
     glActiveTexture(GL_TEXTURE0);
 
-    // sphere to draw (without shader)  
     glPushMatrix();
+
+    // for a sphere orbiting our object vertically
+    glTranslatef(refract_center.x, refract_center.y, refract_center.z);
+    float r = 3;
+    glTranslatef(r * cos(time/500), r * sin(time/500), 0);
+    gluSphere(quad, 1, 20, 20);
+
+    // for a small sphere at the center of our reflected object
     /*glTranslatef(refract_center.x, refract_center.y, refract_center.z);
     gluSphere(quad, .1, 20, 20);*/
-    gluSphere(quad, 1, 20, 20);gluSphere(quad, 1, 20, 20);
-    /*float r = 3;
-    glTranslatef(r * cos(time/500), r * sin(time/500), 0);
-    gluSphere(quad, 1, 20, 20);*/
-
     glPopMatrix();
 
 
@@ -501,44 +506,6 @@ void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up
 
     gluDeleteQuadric(quad);
 }
-
-/*void DrawEngine::render_to_buffer(QGLFramebufferObject* fb, Vector3 eye, Vector3 pos, Vector3 up, int w, int h) {
-
-    fb->bind();
-    float ratio = w / static_cast<float>(h);
-    glMatrixMode(GL_PROJECTION);
-    glLoadIdentity();
-    gluPerspective(camera_.fovy,ratio,camera_.near,camera_.far);
-    gluLookAt(eye.x, eye.y, eye.z + .000000001,
-              pos.x, pos.y, pos.z,
-              up.x, up.y, up.z);
-    glMatrixMode(GL_MODELVIEW);
-    glLoadIdentity();
-
-    GLUquadric* quad = gluNewQuadric();
-
-    glEnable(GL_DEPTH_TEST);
-    glClear(GL_DEPTH_BUFFER_BIT);
-    glEnable(GL_TEXTURE_CUBE_MAP);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textures_["cube_map_1"]);
-    glCallList(models_["skybox"].idx);
-    glEnable(GL_CULL_FACE);
-    glActiveTexture(GL_TEXTURE0);
-
-    // sphere to draw (without shader)
-    glPushMatrix();
-    gluSphere(quad, 1, 20, 20);
-    glPopMatrix();
-
-    glDisable(GL_CULL_FACE);
-    glDisable(GL_DEPTH_TEST);
-    glBindTexture(GL_TEXTURE_CUBE_MAP,0);
-    glDisable(GL_TEXTURE_CUBE_MAP);
-
-    gluDeleteQuadric(quad);
-
-    fb->release();
-}*/
 
 void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h, float time, float theta, float phi) {
 
@@ -587,20 +554,19 @@ void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 po
 
     glBindTexture(GL_TEXTURE_CUBE_MAP, textures_["cube_map_1"]);
 
-    // sphere to draw (without shader)
     glPushMatrix();
-    //glTranslatef(refract_center.x, refract_center.y, refract_center.z);
-    //gluSphere(quad, .1, 20, 20);
+
+    // for a sphere orbiting our object vertically
+    glTranslatef(refract_center.x, refract_center.y, refract_center.z);
+    float r = 3;
+    glTranslatef(r * cos(time/500), r * sin(time/500), 0);
     gluSphere(quad, 1, 20, 20);
+
+    // for a small sphere at the center of our reflected object
+    /*glTranslatef(refract_center.x, refract_center.y, refract_center.z);
+    gluSphere(quad, .1, 20, 20);*/
     glPopMatrix();
-    //glTranslatef();
-    // x = r cos theta
-    // y = r sin theta
-    // r = 3
-    // theta = time
-    /*float r = 3;
-    glTranslatef(r * cos(time/500) + 2, r * sin(time/500), 0);
-    gluSphere(quad, 1, 20, 20);*/
+
 
     // reflect sphere...
     /*shader_programs_["reflect"]->bind();
