@@ -18,7 +18,8 @@ SOURCES += main.cpp\
     glm.cpp \
     CS123Vector.inl \
     CS123Matrix.inl \
-    CS123Matrix.cpp
+    CS123Matrix.cpp \
+    particleemitter.cpp
 
 HEADERS  += mainwindow.h \
     glwidget.h \
@@ -29,7 +30,8 @@ HEADERS  += mainwindow.h \
     CS123Vector.h \
     CS123Matrix.h \
     CS123Algebra.h \
-    CS123Common.h
+    CS123Common.h \
+    particleemitter.h
 
 FORMS    += mainwindow.ui
 

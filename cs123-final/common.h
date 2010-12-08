@@ -9,12 +9,20 @@
 
 #include <iostream>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define SAFE_DELETE(x) if((x)) { delete (x); (x) = NULL; }
 #define MAX(x, y) (x) > (y) ? (x) : (y)
 #define MIN(x, y) (x) < (y) ? (x) : (y)
 #define PI 3.14159265358979323846
-
+/**
+  Returns a uniformly distributed random number on the given interval.
+  ex. urand(-1, 1)  would return a random number between -1 and 1.
+  **/
+static inline float urand(float lower = 0.0f, float upper = 1.0f) {
+    return (rand() % 1000) / 1000.0f * (upper - lower) + lower;
+}
 
 struct float3 {
 

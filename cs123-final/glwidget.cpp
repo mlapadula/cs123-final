@@ -4,11 +4,17 @@
 #include "drawengine.h"
 
 #include <qgl.h>
+#include <GL/glu.h>
 #include <QMouseEvent>
 #include <QWheelEvent>
 #include <QTimer>
 #include <QTime>
 #include <QFileDialog>
+#include <QGLShader>
+#include <QGLShaderProgram>
+#include <QFile>
+
+#include "particleemitter.h"
 
 GLWidget::GLWidget(QWidget *parent) :
     QGLWidget(QGLFormat(QGL::DoubleBuffer), parent) {
@@ -28,12 +34,19 @@ void GLWidget::initializeGL() {
     timer_ = new QTimer(this);
     connect(timer_, SIGNAL(timeout()), this, SLOT(repaint()));
     timer_->start(30.f);
+
+
+    m_emitter = new ParticleEmitter(loadTexture(QFile(":/textures/Particle2.bmp")));
 }
 
 void GLWidget::paintGL() {
     draw_engine_->draw_frame(time_->elapsed(),
                              this->width(), this->height());
     render_text();
+
+    /*m_emitter->updateParticles();       //Move the particles
+    m_emitter->drawParticles();         //Draw the particles*/
+
     glFlush();
     swapBuffers();
 }
@@ -80,4 +93,31 @@ void GLWidget::render_text() {
 
     } this->renderText(10.0, 20.0, "FPS: " + QString::number((int)(prev_fps_)), f);
     this->renderText(10.0, 35.0, "S: Save screenshot", f);
+}
+
+/**
+  This method should load the specified image file as a texture in video memory
+  and return its texture id.
+
+  @TODO: Finish filling this in!
+  **/
+GLuint GLWidget::loadTexture(const QFile &file) {
+    QImage image, texture;
+    if(!file.exists()) return -1;
+    image.load(file.fileName());
+    texture = QGLWidget::convertToGLFormat(image);
+    GLuint *textureID;
+    //Put your code here
+    glEnable(GL_TEXTURE_2D);
+    glGenTextures(1, textureID);
+
+    glBindTexture(GL_TEXTURE_2D, *textureID);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, 3, texture.width(), texture.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, texture.bits());
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+
+    return *textureID; /* return something meaningful */
 }

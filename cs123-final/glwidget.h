@@ -7,6 +7,9 @@ class DrawEngine;
 class QTimer;
 class QTime;
 
+class QFile;
+class ParticleEmitter;
+
 class GLWidget : public QGLWidget {
     Q_OBJECT
 public:
@@ -28,6 +31,9 @@ protected:
     DrawEngine *draw_engine_;
     float prev_fps_;
     float2 mouse_pos_prev_;
+
+    GLuint loadTexture(const QFile &file);
+    ParticleEmitter *m_emitter;
 };
 
 #endif // GLWIDGET_H

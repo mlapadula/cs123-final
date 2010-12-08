@@ -82,7 +82,7 @@ DrawEngine::DrawEngine(const QGLContext *context,int w,int h) : context_(context
     load_shaders();
     load_textures();
     create_fbos(w,h);
-    refract_center = Vector3(2,0,0);
+    refract_center = Vector3(0,0,0);
     refract_cube_map = generate_refract_cube_map();
     refract_every_so_often = 0;
     cout << "Rendering..." << endl;
@@ -286,43 +286,102 @@ void DrawEngine::draw_frame(float time,int w,int h) {
     fps_ = 1000.f / (time - previous_time_),previous_time_ = time;
 
 
+    Vector3 look_vector(camera_.eye.x - camera_.center.x, camera_.eye.y - camera_.center.y, camera_.eye.z - camera_.center.z);
+    look_vector.normalize();
+
+    Vector3 up_vector(camera_.up.x, camera_.up.y, camera_.up.z);
+    up_vector.normalize();
+
+    Vector3 z_axis = -look_vector;
+    Vector3 neg_z_axis = look_vector;
+    Vector3 x_axis = look_vector.cross(up_vector).getNormalized();
+    Vector3 neg_x_axis = -(x_axis.getNormalized());
+    Vector3 y_axis = (x_axis.cross(z_axis)).getNormalized();
+    Vector3 neg_y_axis = -y_axis;
+
+    REAL theta = -acos(x_axis.x);
+    REAL phi = -acos(y_axis.y)+ M_PI;
+
+    if (z_axis.x > 0) {
+        theta = -theta;
+    }
+    if (y_axis.z > 0) {
+        phi = -phi;
+    }
+
+    if (refract_every_so_often % 30 == 0) {
+        cout << "theta: " << theta << endl;
+        cout << "phi: " << phi << endl;
+    }
+
+
     // render the cube map every other frame to save on computing power
     if (refract_every_so_often % 2 == 0) {
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, refract_framebuffer);
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_X, refract_cube_map, 0);
         render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                         Vector3(refract_center.x+1, refract_center.y, refract_center.z),
-                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
+                         Vector3(refract_center.x+z_axis.x, refract_center.y+z_axis.y, refract_center.z+z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
 
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, refract_cube_map, 0);
         render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                         Vector3(refract_center.x-1, refract_center.y, refract_center.z),
-                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
+                         Vector3(refract_center.x+z_axis.x, refract_center.y+z_axis.y, refract_center.z+z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
 
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, refract_cube_map, 0);
         render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                         Vector3(refract_center.x, refract_center.y+1, refract_center.z),
-                         Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+                         Vector3(refract_center.x+z_axis.x, refract_center.y+z_axis.y, refract_center.z+z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
 
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, refract_cube_map, 0);
         render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                         Vector3(refract_center.x, refract_center.y-1, refract_center.z),
-                         Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+                         Vector3(refract_center.x+z_axis.x, refract_center.y+z_axis.y, refract_center.z+z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
 
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, refract_cube_map, 0);
         render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                         Vector3(refract_center.x, refract_center.y, refract_center.z+1),
-                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
+                         Vector3(refract_center.x+z_axis.x, refract_center.y+z_axis.y, refract_center.z+z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
 
         glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, refract_cube_map, 0);
         render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
-                         Vector3(refract_center.x, refract_center.y, refract_center.z-1),
-                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h);
+                         Vector3(refract_center.x+z_axis.x, refract_center.y+z_axis.y, refract_center.z+z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
+
+
+        /*render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x+x_axis.x, refract_center.y+x_axis.y, refract_center.z+x_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
+
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x+neg_x_axis.x, refract_center.y+neg_x_axis.y, refract_center.z+neg_x_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
+
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x+y_axis.x, refract_center.y+y_axis.y, refract_center.z+y_axis.z),
+                         Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h, time);
+
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x+neg_y_axis.x, refract_center.y+neg_y_axis.y, refract_center.z+neg_y_axis.z),
+                         Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h, time);
+
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x+z_axis.x, refract_center.y+z_axis.y, refract_center.z+z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);
+
+        glFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, refract_cube_map, 0);
+        render_to_immediate_buffer(Vector3(refract_center.x,refract_center.y,refract_center.z),
+                         Vector3(refract_center.x+neg_z_axis.x, refract_center.y+neg_z_axis.y, refract_center.z+neg_z_axis.z),
+                         Vector3(camera_.up.x, -camera_.up.y, camera_.up.z), w, h, time);*/
     }
     refract_every_so_often++;
 
     // and render the actual scene
-    render_scene(framebuffer_objects_["fbo_0"], Vector3(camera_.center.x, camera_.center.y, camera_.center.z), Vector3(camera_.eye.x, camera_.eye.y, camera_.eye.z), Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h);
+    render_scene(framebuffer_objects_["fbo_0"], Vector3(camera_.center.x, camera_.center.y, camera_.center.z), Vector3(camera_.eye.x, camera_.eye.y, camera_.eye.z), Vector3(camera_.up.x, camera_.up.y, camera_.up.z), w, h, time, theta, phi);
 
 
     //copy the rendered scene into framebuffer 1
@@ -401,7 +460,7 @@ void DrawEngine::render_blur(float w,float h) {
     framebuffer_objects_["fbo_1"]->release();   // unbind framebuffer
 }
 
-void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up, int w, int h) {
+void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up, int w, int h, float time) {
     float ratio = w / static_cast<float>(h);
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
@@ -423,9 +482,15 @@ void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up
     glEnable(GL_CULL_FACE);
     glActiveTexture(GL_TEXTURE0);
 
-    // sphere to draw (without shader)
+    // sphere to draw (without shader)  
     glPushMatrix();
-    gluSphere(quad, 1, 20, 20);
+    /*glTranslatef(refract_center.x, refract_center.y, refract_center.z);
+    gluSphere(quad, .1, 20, 20);*/
+    gluSphere(quad, 1, 20, 20);gluSphere(quad, 1, 20, 20);
+    /*float r = 3;
+    glTranslatef(r * cos(time/500), r * sin(time/500), 0);
+    gluSphere(quad, 1, 20, 20);*/
+
     glPopMatrix();
 
 
@@ -475,7 +540,7 @@ void DrawEngine::render_to_immediate_buffer(Vector3 eye, Vector3 pos, Vector3 up
     fb->release();
 }*/
 
-void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h) {
+void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 pos, Vector3 up, int w, int h, float time, float theta, float phi) {
 
     fb->bind();
     float ratio = w / static_cast<float>(h);
@@ -507,13 +572,16 @@ void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 po
     // refracted sphere...
     shader_programs_["refract"]->bind();
     shader_programs_["refract"]->setUniformValue("CubeMap",GL_TEXTURE0);
+    shader_programs_["refract"]->setUniformValue("theta", theta);
+    shader_programs_["refract"]->setUniformValue("phi", phi);
     glPushMatrix();
     //glTranslatef(-1.25f,0.f,0.f);
     //glCallList(models_["dragon"].idx);
     glTranslatef(refract_center.x, refract_center.y, refract_center.z);
     gluSphere(quad, 1, 20, 20);
-    glTranslatef(-refract_center.x, -refract_center.y, -refract_center.z);
     //drawKleinBottle();
+    glTranslatef(-refract_center.x, -refract_center.y, -refract_center.z);
+
     glPopMatrix();
     shader_programs_["refract"]->release();
 
@@ -521,8 +589,18 @@ void DrawEngine::render_scene(QGLFramebufferObject* fb, Vector3 look, Vector3 po
 
     // sphere to draw (without shader)
     glPushMatrix();
+    //glTranslatef(refract_center.x, refract_center.y, refract_center.z);
+    //gluSphere(quad, .1, 20, 20);
     gluSphere(quad, 1, 20, 20);
     glPopMatrix();
+    //glTranslatef();
+    // x = r cos theta
+    // y = r sin theta
+    // r = 3
+    // theta = time
+    /*float r = 3;
+    glTranslatef(r * cos(time/500) + 2, r * sin(time/500), 0);
+    gluSphere(quad, 1, 20, 20);*/
 
     // reflect sphere...
     /*shader_programs_["reflect"]->bind();
