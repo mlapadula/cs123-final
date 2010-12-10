@@ -9,6 +9,6 @@ void main()
 	
 	normal = normalize( gl_NormalMatrix * gl_Normal );
 	vec3 I = normalize(vVertex - eyeVec.xyz); // Eye to vertex
-  r = refract(I,normal, 0.9);
+  	r = refract(I,normal, 0.6);
 }
 
