@@ -106,18 +106,18 @@ GLuint GLWidget::loadTexture(const QFile &file) {
     if(!file.exists()) return -1;
     image.load(file.fileName());
     texture = QGLWidget::convertToGLFormat(image);
-    GLuint *textureID;
+    GLuint textureID;
     //Put your code here
-    glEnable(GL_TEXTURE_2D);
-    glGenTextures(1, textureID);
 
-    glBindTexture(GL_TEXTURE_2D, *textureID);
+    glEnable(GL_TEXTURE_2D);
+
+    glGenTextures(1, &textureID);
+
+    glBindTexture(GL_TEXTURE_2D, textureID);
 
     glTexImage2D(GL_TEXTURE_2D, 0, 3, texture.width(), texture.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, texture.bits());
-
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-
-    return *textureID; /* return something meaningful */
+    return textureID; /* return something meaningful */
 }

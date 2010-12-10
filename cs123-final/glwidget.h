@@ -15,7 +15,7 @@ class GLWidget : public QGLWidget {
 public:
     GLWidget(QWidget *parent = 0);
     ~GLWidget();
-
+    static GLuint loadTexture(const QFile &file);
 protected:
     void initializeGL();
     void paintGL();
@@ -32,7 +32,7 @@ protected:
     float prev_fps_;
     float2 mouse_pos_prev_;
 
-    GLuint loadTexture(const QFile &file);
+
     ParticleEmitter *m_emitter;
 };
 

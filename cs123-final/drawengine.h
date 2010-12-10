@@ -75,6 +75,7 @@ protected:
     Camera                                      camera_; ///a simple camera struct
 
     Vector3 refract_center;
+    GLuint checker_texture;
 
     /*GLuint load_cube_map(QGLFramebufferObject* posx, QGLFramebufferObject* negx, QGLFramebufferObject* posy,
                                      QGLFramebufferObject* negy, QGLFramebufferObject* posz, QGLFramebufferObject* negz, int w, int h);*/
